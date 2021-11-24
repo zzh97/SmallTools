@@ -1,0 +1,200 @@
+<p>
+    <button onclick="open_camera()">录播</button>
+    <button onclick="close_camera()">停止</button>
+    <button onclick="screen_capture()">截图</button>
+    <button onclick="alive()">录屏</button>
+    <button onclick="down_load()">下载</button>
+</p>
+<video controls></video>
+<canvas id="canvas"></canvas>
+<script type="text/javascript">
+    /*
+    Question
+    Q1: 录屏如何包含摄像头 --Half Finish（二者可录其一）
+    Q2: 为什么录屏没有音轨
+    Q3: 如何实现断点传输，甚至低延迟直播
+    Q4: 如何设置录制时的音视频质量  --Finish
+    */
+    // 兼容性考量
+    window.URL = (window.URL || window.webkitURL || window.mozURL || window.msURL);
+    // 老的浏览器可能根本没有实现 mediaDevices，所以我们可以先设置一个空的对象
+    if (navigator.mediaDevices === undefined) {
+        navigator.mediaDevices = {};
+    }
+    // 一些浏览器部分支持 mediaDevices。我们不能直接给对象设置 getUserMedia
+    // 因为这样可能会覆盖已有的属性。这里我们只会在没有getUserMedia属性的时候添加它。
+    if (navigator.mediaDevices.getUserMedia === undefined) {
+        navigator.mediaDevices.getUserMedia = function (constraints) {
+            // 首先，如果有getUserMedia的话，就获得它
+            var getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+            // 一些浏览器根本没实现它 - 那么就返回一个error到promise的reject来保持一个统一的接口
+            if (!getUserMedia) {
+                return Promise.reject(new Error('getUserMedia is not implemented in this browser'));
+            }
+            // 否则，为老的navigator.getUserMedia方法包裹一个Promise
+            return new Promise(function (resolve, reject) {
+                getUserMedia.call(navigator, constraints, resolve, reject);
+            });
+        }
+    }
+
+    // video DOM
+    var video = document.querySelector('video');
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+    // 配置项
+    var options = {
+        // 是否录制声音
+        audio: true,
+        // 
+        video: {
+            width: 200,
+            height: 400
+            // ideal是理想值（即优先使用）
+            // width: { min: 200, ideal: 300, max: 400 },
+            // height: { min: 400, ideal: 600, max: 800 }
+        }
+    };
+    let streamTrack = null;
+
+    // 打开摄像头
+    let open_camera = () => {
+        // 调用摄像头，返回promise（resolve回调参数为媒体流, 一个MediaStream对象），IE不支持
+        navigator.mediaDevices.getUserMedia(options)
+            .then(stream => {
+                console.log('stream', stream)
+                // 媒体流 赋给 媒体轨
+                streamTrack = stream
+                // 旧的浏览器可能没有srcObject
+                if ('srcObject' in video) {
+                    video.srcObject = stream;
+                } else {
+                    // 防止在新的浏览器里使用它，应为它已经不再支持了
+                    video.src = window.URL && window.URL.createObjectURL(stream) || stream
+                }
+                // 获取媒体流后，播放
+                video.onloadedmetadata = e => {
+                    video.play();
+                };
+
+
+                // 需要更好的浏览器支持
+                // 检查浏览器是否支持此种mimeType
+                const mine = MediaRecorder.isTypeSupported('video/webm; cidecs=vp9')
+                    ? 'video/webm; codecs=vp9'
+                    : 'video/webm'
+                // 创建一个对媒体流经行录制的对象（一个MediaRecorder对象，包含了MediaStream对象，和一些监听事件）
+                let mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: mine,
+                })
+
+                // 每次成功捕捉，都会将获取到的blob传入chunks（blob.size中的单位是字节）
+                let chunks = []
+                mediaRecorder.addEventListener('dataavailable', e => {
+                    chunks.push(e.data)
+                    console.log('e.data', e.data)
+                })
+
+                // 停止捕捉式，用chunks生产一个完整的blob
+                mediaRecorder.addEventListener('stop', () => {
+                    let blob = new Blob(chunks, {
+                        type: chunks[0].type
+                    })
+                    console.log('blob', blob)
+                    let url = URL.createObjectURL(blob)
+                    video.srcObject = null;
+                    video.src = url
+                    // 由于上方的video.play()，导致这里会自动播放
+                    setTimeout(()=>{
+                        video.pause()
+                    }, 50)
+                })
+
+                // 必须手动启动
+                mediaRecorder.start()
+            })
+            .catch(err => {
+                console.log(err.name + ": " + err.message);
+            }); // always check for errors at the end.
+
+    }
+
+    // 关闭摄像头
+    var close_camera = () => {
+        // 获取轨道（getVideoTracks是获取视轨，getaudioTracks是获取音轨）
+        // 而getTracks将会同时获得二者（两个MediaStreamTrack对象，一个kind为audio，一个kind为vedio） 
+        streamTrack.getTracks().forEach(track => {
+            console.log('track', track)
+            track.stop();
+            ctx.clearRect(0, 0, ctx.width, ctx.height);//清除画布
+        })
+    }
+
+    // 截图
+    var screen_capture = () => {
+        canvas.setAttribute("width", video.videoWidth);
+        canvas.setAttribute("height", video.videoHeight);
+        ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+    }
+
+    // 录屏
+    let alive = async () => {
+        // 唤起窗口捕捉，获取媒体流（一个MediaStream对象）
+        let stream = await navigator.mediaDevices.getDisplayMedia({
+            video: true, // 不支持IE和移动端
+            audio: true, // 仅windows中的chrome、edge全面支持
+            // audio: {
+            //     echoCancellation: true, // 是否首选和/或需要回声消除
+            //     noiseSuppression: true, // 是否首选和/或需要噪声抑制
+            //     sampleRate: 44100 // 可接受和/或要求的采样率或采样率范围
+            // }
+        })
+        console.log('stream', stream)
+
+        // 需要更好的浏览器支持
+        // 检查浏览器是否支持此种mimeType
+        const mine = MediaRecorder.isTypeSupported('video/webm; cidecs=vp9')
+            ? 'video/webm; codecs=vp9'
+            : 'video/webm'
+
+        // 创建一个对媒体流经行录制的对象（一个MediaRecorder对象，包含了MediaStream对象，和一些监听事件）
+        let mediaRecorder = new MediaRecorder(stream, {
+            mimeType: mine,
+            // 音视频的编码比率
+            // audioBitsPerSecond: 128000,
+            // videoBitsPerSecond: 2500000,
+            // 是否录制无声的输入源（true是否，默认是false）
+            // ignoreMutedMedia: true
+        })
+
+        console.log('mediaRecorder', mediaRecorder)
+
+        // 每次成功捕捉，都会将获取到的blob传入chunks（blob.size中的单位是字节）
+        let chunks = []
+        mediaRecorder.addEventListener('dataavailable', e => {
+            chunks.push(e.data)
+            console.log('e.data', e.data)
+        })
+
+        // 停止捕捉式，用chunks生产一个完整的blob
+        mediaRecorder.addEventListener('stop', () => {
+            let blob = new Blob(chunks, {
+                type: chunks[0].type
+            })
+            console.log('blob', blob)
+            let url = URL.createObjectURL(blob)
+            video.src = url
+        })
+
+        // 必须手动启动
+        mediaRecorder.start()
+    }
+
+    // 下载
+    let down_load = () => {
+        let a = document.createElement('a')
+        a.href = video.src
+        a.download = 'video.webm'
+        a.click()
+    }
+</script>
