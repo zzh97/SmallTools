@@ -1,0 +1,18 @@
+<!--index.wxml-->
+<view class="container" style="height: 100vh; overflow: hidden;">
+  <canvas wx:if="{{isNewCanvas}}" id="myCanvas" type="2d"
+  disable-scroll="{{true}}"
+  style="border:1px solid #d3d3d3; width:{{width + 'rpx'}}; height:{{height + 'rpx'}};"
+  bindtouchstart="start"
+  bindtouchmove="move"
+  bindtouchend="end"/>
+  <!-- V2.9.0以下 -->
+  <canvas wx:if="{{!isNewCanvas}}" canvas-id="myCanvas"
+  disable-scroll="{{true}}"
+  style="border:1px solid #d3d3d3; width:{{width + 'rpx'}}; height:{{height + 'rpx'}};"
+  bindtouchstart="start"
+  bindtouchmove="move"
+  bindtouchend="end"/>
+  <button bindtap="clearCanvas">重写</button>
+  <button bindtap="exportCanvas">导出</button>
+</view>
