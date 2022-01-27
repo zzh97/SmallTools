@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ZH-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>可视化音乐</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+
+    #canvas {
+      display: block;
+      background: linear-gradient(135deg, rgb(142, 13, 133) 0%, rgb(230, 132, 110) 100%);
+    }
+  </style>
+</head>
+
+<body>
+  <audio id="music"></audio>
+  <button id="btn" style="position: fixed; top: 0; width: 100px; height: 40px; font-size: 18px;">play</button>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    // 设置canvas的宽高与颜色，并返回配置
+    const canvas_init = (params) => {
+      let { ctx, colorArr = ['#000', '#069', '#f6f', '#000', '#069', '#f6f'] } = params
+      // 全屏
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      let width = canvas.width;
+      let height = canvas.height;
+      // 给条条加颜色
+      let color1 = ctx.createLinearGradient(width / 2, height / 2 - 30, width / 2, height / 2 - 100);
+      let color2 = ctx.createLinearGradient(width / 2, height / 2 + 30, width / 2, height / 2 + 100);
+      color1.addColorStop(0, colorArr[0]);
+      color1.addColorStop(.5, colorArr[1]);
+      color1.addColorStop(1, colorArr[2]);
+      color2.addColorStop(0, colorArr[0]);
+      color2.addColorStop(.5, colorArr[1]);
+      color2.addColorStop(1, colorArr[2]);
+      let info = {
+        width,
+        height,
+        color1,
+        color2
+      }
+      return info
+    }
+    // 分析音乐
+    const analyse_music = (music) => {
+      // 创建音频上下文对象
+      let oCtx = new AudioContext();
+      // 创建媒体源,除了audio本身可以获取，也可以通过oCtx对象提供的api进行媒体源操作
+      let audioSrc = oCtx.createMediaElementSource(music);
+      // 创建分析机 
+      let analyser = oCtx.createAnalyser();
+      // 媒体源与分析机连接
+      audioSrc.connect(analyser);
+      // 输出的目标：将分析机分析出来的处理结果与目标点（耳机/扬声器）连接
+      analyser.connect(oCtx.destination);
+      return analyser
+    }
+    // 根据频率绘制音乐
+    const draw_music = (params) => {
+      let { ctx, analyser, voiceHeight, count, info } = params
+      // 将当前的频率数据复制到传入的无符号字节数组中，做到实时连接
+      analyser.getByteFrequencyData(voiceHeight);
+      // 自定义获取数组里边数据的频步
+      let step = Math.round(voiceHeight.length / count);
+      let oW = info.width
+      let oH = info.height
+      // 清屏
+      ctx.clearRect(0, 0, oW, oH);
+      for (let i = 0; i < count; i++) {
+        let audioHeight = voiceHeight[step * i];
+        ctx.fillStyle = info.color1;  // 绘制向上的线条
+        ctx.fillRect(oW / 2 + (i * 10), oH / 2, 7, -audioHeight);
+        ctx.fillRect(oW / 2 - (i * 10), oH / 2, 7, -audioHeight);
+        ctx.fillStyle = info.color2;  // 绘制向下的线条
+        ctx.fillRect(oW / 2 + (i * 10), oH / 2, 7, audioHeight);
+        ctx.fillRect(oW / 2 - (i * 10), oH / 2, 7, audioHeight);
+      }
+      // 每次动画重绘都会调用该函数，requestAnimationFrame的性能高于定时器
+      // 为了能够传入带参函数，故用匿名函数来包裹
+      window.requestAnimationFrame(function () {
+        draw_music(params)
+      });
+    }
+    // 音乐的播放与暂停（包含绘制）
+    const btn_action = (params) => {
+      let { btn, music } = params
+      // 音乐播放 
+      if (music.paused) {
+        music.play();
+        btn.innerText = 'pause'
+      }
+      else {
+        music.pause();
+        btn.innerText = 'play'
+      }
+    }
+    // 主函数
+    const __main__ = () => {
+      // canvas可以直接取
+      let ctx = canvas.getContext('2d');
+      // canvas初始化，并返回配置信息
+      let info = canvas_init({
+        ctx,
+        // 音频条的颜色
+        // colorArr: ['#000', '#069', '#f6f', '#000', '#069', '#f6f']
+        colorArr: ['#213', '#426', '#639']
+      })
+      // 音乐的播放与暂停
+      let music = document.getElementById('music');
+      music.src = "./music.mp3"
+      let btn = document.getElementById('btn');
+      btn.onclick = function () {
+        btn_action({
+          btn,
+          music,
+        })
+      }
+      // 音乐的绘制（由于chrome的更新，需要绑定在一个用户事件中）
+      const up_action = () => {
+        // 音频分析结果
+        let analyser = analyse_music(music)
+        // 音频图的条数
+        let count = 100;
+        // 缓冲区:进行数据的缓冲处理，转换成二进制数据
+        let voiceHeight = new Uint8Array(analyser.frequencyBinCount);
+        draw_music({
+          ctx,
+          analyser,
+          voiceHeight,
+          count,
+          info,
+        })
+        // 只执行一次
+        window.removeEventListener('mouseup', up_action)
+      }
+      window.addEventListener('mouseup', up_action)
+    }
+    // ES5老套路
+    window.onload = function () {
+      __main__()
+    }
+
+  </script>
+</body>
+
+</html>
