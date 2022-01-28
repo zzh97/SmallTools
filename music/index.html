@@ -12,25 +12,172 @@
       padding: 0;
     }
 
+    body {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      background: #444;
+    }
+
+    #page {
+      position: relative;
+      overflow: hidden;
+      max-width: 450px;
+      width: 100%;
+      height: 100%;
+    }
+
     #canvas {
       display: block;
-      background: linear-gradient(135deg, rgb(142, 13, 133) 0%, rgb(230, 132, 110) 100%);
+      /* background: linear-gradient(135deg, rgb(142, 13, 133) 0%, rgb(230, 132, 110) 100%); */
+    }
+    #title {
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      height: 40px;
+      background: rgba(0, 0, 0, 0.5);
+      color: #fff;
+    }
+    #load {
+      position: absolute;
+      top: 0;
+      left: 10px;
+      line-height: 40px;
+      cursor: pointer;
+    }
+    #set {
+      position: absolute;
+      top: 0;
+      right: 10px;
+      line-height: 40px;
+      cursor: pointer;
+    }
+    #name {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      line-height: 40px;
+    }
+
+    #menu {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      height: 40px;
+      background: rgba(0, 0, 0, 0.5);
+      color: #fff;
+    }
+
+    #btn {
+      width: 80px;
+      height: 40px;
+      line-height: 40px;
+      font-size: 18px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    #sort {
+      position: absolute;
+      top: 0;
+      left: 10px;
+      line-height: 40px;
+      cursor: pointer;
+    }
+
+    #list {
+      position: absolute;
+      top: 0;
+      right: 10px;
+      line-height: 40px;
+      cursor: pointer;
     }
   </style>
 </head>
 
 <body>
-  <audio id="music"></audio>
-  <button id="btn" style="position: fixed; top: 0; width: 100px; height: 40px; font-size: 18px;">play</button>
-  <canvas id="canvas"></canvas>
-
+  <div id="page">
+    <audio id="music"></audio>
+    <div id="title">
+      <div id="name">歌名</div>
+      <div id="load" onclick="todo()">导入</div>
+      <div id="set" onclick="todo()">设置</div>
+    </div>
+    <canvas id="canvas"></canvas>
+    <div id="menu">
+      <div id="sort" onclick="todo()">顺序</div>
+      <div id="btn">play</div>
+      <div id="list" onclick="todo()">列表</div>
+    </div>
+  </div>
   <script>
+    const todo = () => {
+      alert ('回家过年了，暂未实现')
+    }
+    // 图片加载
+    const load_img = (path) => {
+      // 声明image对象
+      let img = new Image()
+      // 图片路径
+      img.src = path
+      // 返回对象
+      return img
+    }
+    // 图片尺寸自适应
+    const auto_img_size = (params) => {
+      let { img, width = 'auto', height = 'auto' } = params
+      // 长宽比
+      let imgScalc = img.width / img.height;
+      let imgWidth = img.width
+      let imgHeight = img.height
+      if (width == 'auto' && height == 'auto') {
+
+      }
+      else if (width == 'auto') {
+        imgHeight = height
+        imgWidth = imgHeight * imgScalc
+      }
+      else if (height == 'auto') {
+        imgWidth = width
+        imgHeight = imgWidth / imgScalc
+      }
+      else {
+        imgWidth = width
+        imgHeight = height
+      }
+      return {
+        width: imgWidth,
+        height: imgHeight
+      }
+    }
+    // 绘制背景图片
+    const draw_img = (ctx, img) => {
+      // 高度铺满，宽度自适应
+      let size = auto_img_size({
+        img,
+        height: canvas.height
+      })
+      ctx.drawImage(img, 0, 0, size.width, size.height)
+    }
     // 设置canvas的宽高与颜色，并返回配置
     const canvas_init = (params) => {
       let { ctx, colorArr = ['#000', '#069', '#f6f', '#000', '#069', '#f6f'] } = params
+      let page = document.getElementById('page')
       // 全屏
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      // canvas.width = window.innerWidth;
+      // canvas.height = window.innerHeight;
+      canvas.width = page.offsetWidth;
+      canvas.height = page.offsetHeight;
       let width = canvas.width;
       let height = canvas.height;
       // 给条条加颜色
@@ -64,9 +211,38 @@
       analyser.connect(oCtx.destination);
       return analyser
     }
+    // 画圆
+    const draw_round = (ctx, w = 300, h = 400, vh = 7, i) => {
+        if (i >= 36) {
+          return
+        }
+        // 半径
+        let r = 150
+        // 极角
+        let a = (Math.PI / 18) * i
+        // 弦与x轴的夹角
+        let b = (Math.PI - a) / 2
+        // 弦长
+        let l = 2 * Math.sin(a/2) * r
+        // 圆上的点
+        let x = w - Math.cos(b) * l
+        let y = h - Math.sin(b) * l
+        let ah = -(vh/ 10) > 5? -(vh/ 10) : 5
+        let red = 200 + 1 * i
+        let green = 164 + 2 * i
+        let blue = 128 + 3 * i
+        red = 150 + ah*5
+        green = 130 + ah*4
+        blue = 110 + ah*3
+        ctx.fillStyle = `rgba(${red},${green},${blue}, 1)`;
+        // ctx.fillRect(x, y, vh/10, vh/10)
+        ctx.beginPath();
+        ctx.arc(x,y,ah,0,2*Math.PI);
+        ctx.fill();
+    }
     // 根据频率绘制音乐
     const draw_music = (params) => {
-      let { ctx, analyser, voiceHeight, count, info } = params
+      let { ctx, analyser, voiceHeight, count, info, img } = params
       // 将当前的频率数据复制到传入的无符号字节数组中，做到实时连接
       analyser.getByteFrequencyData(voiceHeight);
       // 自定义获取数组里边数据的频步
@@ -75,14 +251,18 @@
       let oH = info.height
       // 清屏
       ctx.clearRect(0, 0, oW, oH);
+      draw_img(ctx, img)
       for (let i = 0; i < count; i++) {
         let audioHeight = voiceHeight[step * i];
         ctx.fillStyle = info.color1;  // 绘制向上的线条
-        ctx.fillRect(oW / 2 + (i * 10), oH / 2, 7, -audioHeight);
-        ctx.fillRect(oW / 2 - (i * 10), oH / 2, 7, -audioHeight);
-        ctx.fillStyle = info.color2;  // 绘制向下的线条
-        ctx.fillRect(oW / 2 + (i * 10), oH / 2, 7, audioHeight);
-        ctx.fillRect(oW / 2 - (i * 10), oH / 2, 7, audioHeight);
+        let w = (oW / 2) + (i * 10)
+        let h = (oH - 50)
+        draw_round(ctx, (oW - 60), (oH / 2), -audioHeight, i)
+        // ctx.fillRect(w, h, 7, -audioHeight);
+        // ctx.fillRect(oW / 2 - (i * 10), oH - 50, 7, -audioHeight);
+        // ctx.fillStyle = info.color2;  // 绘制向下的线条
+        // ctx.fillRect(oW / 2 + (i * 10), oH / 2, 7, audioHeight);
+        // ctx.fillRect(oW / 2 - (i * 10), oH / 2, 7, audioHeight);
       }
       // 每次动画重绘都会调用该函数，requestAnimationFrame的性能高于定时器
       // 为了能够传入带参函数，故用匿名函数来包裹
@@ -111,8 +291,7 @@
       let info = canvas_init({
         ctx,
         // 音频条的颜色
-        // colorArr: ['#000', '#069', '#f6f', '#000', '#069', '#f6f']
-        colorArr: ['#213', '#426', '#639']
+        colorArr: ['#fff', '#fff', '#fff']
       })
       // 音乐的播放与暂停
       let music = document.getElementById('music');
@@ -124,12 +303,18 @@
           music,
         })
       }
+      // 背景图片
+      let img = load_img('figure.jpg')
+      // 加载图片是需要时间的（如果在加载前drawImage，会是空白且width=0）
+      img.onload = () => {
+        draw_img(ctx, img)
+      }
       // 音乐的绘制（由于chrome的更新，需要绑定在一个用户事件中）
       const up_action = () => {
         // 音频分析结果
         let analyser = analyse_music(music)
         // 音频图的条数
-        let count = 100;
+        let count = 50;
         // 缓冲区:进行数据的缓冲处理，转换成二进制数据
         let voiceHeight = new Uint8Array(analyser.frequencyBinCount);
         draw_music({
@@ -138,10 +323,12 @@
           voiceHeight,
           count,
           info,
+          img,
         })
         // 只执行一次
         window.removeEventListener('mouseup', up_action)
       }
+
       window.addEventListener('mouseup', up_action)
     }
     // ES5老套路
